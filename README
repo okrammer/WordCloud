@@ -1,0 +1,5 @@
+A simple Play application which uses akka and websockets
+=========================================================
+
+Access the application under http://localhost:9000/(http://localhost:9000/)
+and put some string in the text box the application will reverse the sting async.
