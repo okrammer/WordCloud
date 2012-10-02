@@ -44,19 +44,13 @@ object Application extends Controller {
 
   private def processInboundMessage(json: JsValue, send: JsValue => Unit) {
 
-    val string = json.asOpt[String].getOrElse("")
-
-    def sendStringMessage(string: String){
-      send(toJson(string))
-    }
-
     // use here an actor so we can possibly address this actor over remote
-    val targetActor = Akka.system.actorOf(Props(new MessageSendingActor(sendStringMessage)))
+    val targetActor = Akka.system.actorOf(Props(new MessageSendingActor(send)))
 
     // the actual calculation actor for long running tasks
     val processingActor = Akka.system.actorOf(Props[MessageProcessingActor])
 
-    processingActor ! ProcessingTask(string, targetActor)
+    processingActor ! ProcessingTask(json, targetActor)
   }
 
 }

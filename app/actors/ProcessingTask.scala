@@ -1,6 +1,7 @@
 package actors
 
 import akka.actor.ActorRef
+import play.api.libs.json.JsValue
 
 /**
  * Created with IntelliJ IDEA.
@@ -9,4 +10,4 @@ import akka.actor.ActorRef
  * Time: 10:10
  * To change this template use File | Settings | File Templates.
  */
-case class ProcessingTask(string: String, resultHandler: ActorRef)
+case class ProcessingTask(msg: JsValue, resultHandler: ActorRef)
