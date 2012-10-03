@@ -1,20 +1,61 @@
 @(websocketUrl: String)
 
-@main("Simple Client", scripts = Seq("jquery.websocket-0.0.1.js", "jquery.json-2.3.min.js")) {
-<h1>Simple Client</h1>
-<section id="content"></section>
-<input id="message" type="text"/>
+@main("Query Client", scripts = Seq("jquery.websocket-0.0.1.js", "jquery.json-2.3.min.js")) {
+<h1>Query Client</h1>
+<div style="float: left; width: 30%">
+    <input id="query" type="text"/>
+    <input id="resultsPerPage" maxlength="4" size="3" type="text" value="100"/>
+    <input type="button" id="start" value="start"/>
+    <input type="button" id="stop" value="stop"/>
+    <div id="content"></div>
+</div>
+<div id="status" style="float: left; width: 30%; overflow: scroll;">
+    <table>
+        <tr>
+            <td>Page</td>
+            <td id="stats_page"></td>
+        </tr>
+        <tr>
+            <td>Tweets</td>
+            <td id="stats_tweets"></td>
+        </tr>
+    </table>
+</div>
+<div id="log" style="float: left; width: 30%; overflow: scroll;"></div>
 <script>
-    var ws = $.websocket("@websocketUrl", {
-        events:{
-            message:function (e) {
-                $('#content').append(e.data + '<br>')
+    var resultHandler = {
+        histogram:function (msg) {
+            $('#content').children().remove()
+            var table = $("<table>")
+            var entries = msg.data
+            for (var i = 0; i < entries.length; i++) {
+                table.append($("<tr><td>" + entries[i].word + "</td><td>" + entries[i].count + "</td></tr>"))
             }
+            $('#content').append(table)
+        },
+
+        log:function (msg) {
+            $("#log").prepend($("<p>" + msg.data + "</p>"))
+        },
+
+        stats: function(msg){
+            $("#stats_" + msg.data.name).text(msg.data.value)
         }
+    }
+
+
+    var ws = $.websocket("@websocketUrl", {
+        events:resultHandler
     });
-    $('#message').change(function () {
-        ws.send('message', this.value);
-        this.value = '';
+    $('#start').click(function () {
+        var resultsPerPage = parseInt($("#resultsPerPage").val())
+        var queryString = $("#query").val()
+
+        if(queryString && resultsPerPage)
+            ws.send('query', {query: queryString, resultsPerPage: resultsPerPage});
+    });
+    $('#stop').click(function () {
+        ws.send('stop', {});
     });
 </script>
 }

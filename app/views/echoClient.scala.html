@@ -1,6 +1,6 @@
 @(websocketUrl: String)
 
-@main("Simple Client", scripts = Seq("jquery.websocket-0.0.1.js", "jquery.json-2.3.min.js")) {
+@main("Echo Client", scripts = Seq("jquery.websocket-0.0.1.js", "jquery.json-2.3.min.js")) {
 <h1>Simple Client</h1>
 <section id="content"></section>
 <input id="message" type="text"/>
@@ -8,12 +8,12 @@
     var ws = $.websocket("@websocketUrl", {
         events:{
             message:function (e) {
-                $('#content').append(e.data + '<br>')
+                $('#content').append(e.data.msg + '<br>')
             }
         }
     });
     $('#message').change(function () {
-        ws.send('message', this.value);
+        ws.send('message', {"cmd": "echo", "arg":  this.value});
         this.value = '';
     });
 </script>

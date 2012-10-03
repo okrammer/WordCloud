@@ -1,8 +1,8 @@
 package controllers
 
 import play.api.mvc._
-import akka.actor.Props
-import actors.{ProcessingTask, MessageProcessingActor, MessageSendingActor}
+import akka.actor.{ActorRef, Props}
+import actors.{Inbound, MessageProcessingActor}
 import play.api.Play.current
 import play.api.libs.json.{JsValue, Json}
 import play.api.libs.iteratee.{Enumerator, Iteratee}
@@ -11,29 +11,40 @@ import play.api.libs.json.Json._
 
 object Application extends Controller {
 
-  def simpleClient = Action {
+  def queryClient = Action {
     implicit request =>
       val webSocketUrl = routes.Application.wsevents().webSocketURL(false)
-      Ok(views.html.simpleClient(webSocketUrl))
+      Ok(views.html.queryClient(webSocketUrl))
   }
+
+  def echoClient = Action {
+    implicit request =>
+      val webSocketUrl = routes.Application.wsevents().webSocketURL(false)
+      Ok(views.html.echoClient(webSocketUrl))
+  }
+
 
   def wsevents = WebSocket.using[String] {
     request =>
 
       val out = Enumerator.imperative[String]()
 
-      def sendOutboundMessage(value: JsValue) {
-        val jsonMessage = toJson(Map("type" -> toJson("message"), "data" -> value))
+      def sendOutboundMessage(msgType: String, value: JsValue) {
+        val jsonMessage = toJson(Map("type" -> toJson(msgType), "data" -> value))
         val msg = Json.stringify(jsonMessage)
         println("putting:" + msg)
         out.push(msg)
       }
 
+      val processingActor = Akka.system.actorOf(Props(new MessageProcessingActor(sendOutboundMessage)))
+
       val in = Iteratee.foreach[String] {
         value =>
           println("getting:" + value)
-          val json = Json.parse(value) \ "data"
-          processInboundMessage(json, sendOutboundMessage)
+          val json = Json.parse(value)
+          val data =  json \ "data"
+          val msgType = (json \ "type").as[String]
+          processingActor ! Inbound(msgType, data)
       }.mapDone {
         _ =>
           println("Disconnected")
@@ -42,15 +53,11 @@ object Application extends Controller {
       (in, out)
   }
 
-  private def processInboundMessage(json: JsValue, send: JsValue => Unit) {
+  private def processInboundMessage(json: JsValue, processingActor: ActorRef, send: (String, JsValue) => Unit) {
 
     // use here an actor so we can possibly address this actor over remote
-    val targetActor = Akka.system.actorOf(Props(new MessageSendingActor(send)))
 
-    // the actual calculation actor for long running tasks
-    val processingActor = Akka.system.actorOf(Props[MessageProcessingActor])
 
-    processingActor ! ProcessingTask(json, targetActor)
   }
 
 }
