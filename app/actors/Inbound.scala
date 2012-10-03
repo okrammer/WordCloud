@@ -1,17 +1,13 @@
 package actors
 
-import akka.actor.Actor
+import akka.actor.ActorRef
 import play.api.libs.json.JsValue
 
 /**
  * Created with IntelliJ IDEA.
  * User: okrammer
  * Date: 02/10/2012
- * Time: 09:24
+ * Time: 10:10
  * To change this template use File | Settings | File Templates.
  */
-class MessageSendingActor(sender: (JsValue) => Unit) extends Actor{
-  protected def receive = {
-    case msg: JsValue => sender(msg)
-  }
-}
+case class Inbound(msgType: String, data: JsValue)
