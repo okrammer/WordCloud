@@ -27,13 +27,21 @@ class JsonParseActor extends Actor {
         for {
           text <- texts
           t <- text.asOpt[String]
-          token <- t.split("[^\\w@_]")
-          if (token.size > 5)
-        } context.parent ! Histogram(Seq(token.toLowerCase -> 1))
+          token <- t.split("[\\s]")
+          strippedToken = token.replaceAll("[#?.!,;:&()]", "").toLowerCase
+          if (strippedToken.size > 3)
+          if ! (JsonParseActor.blacklist contains strippedToken)
+          if !strippedToken.startsWith("http")
+          if !strippedToken.startsWith("@")
+        } context.parent ! Histogram(Seq(strippedToken -> 1))
       }
 
       context.stop(self)
   }
 
+}
 
+object JsonParseActor {
+  val blacklist = Set("line", "from", "with", "like", "your", "you", "that", "will", "amp", "this", "just", "does",
+    "about", "more", "can't", "have", "every", "any", "what", "into", "there", "does", "i've", "some", "here")
 }

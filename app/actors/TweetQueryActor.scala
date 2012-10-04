@@ -31,8 +31,9 @@ class TweetQueryActor(query: Query) extends Actor {
       latestHistogram = Some(histogram)
 
     case Transmit() =>
+      val sum = latestHistogram.get.map.map(_._2).sum
       val objects = latestHistogram.get.map.collect {
-        case (word, count) => JsObject(Seq("word" -> toJson(word), "count" -> toJson(count)))
+        case (word, count) => JsObject(Seq("word" -> toJson(word), "count" -> toJson(count / sum.toDouble)))
       }
       latestHistogram = None
       context.parent ! Outbound("histogram", toJson(objects))

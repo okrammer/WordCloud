@@ -33,7 +33,7 @@ class TweetLoaderActor(query: Query) extends Actor {
           }
       }
 
-      context.parent ! Histogram(currentHistogram.toList.filter(_._2 > 10).sortBy(_._2).reverse.take(30))
+      context.parent ! Histogram(currentHistogram.toList.sortBy(_._2).reverse.take(20))
 
     case LoadNextPage(page) =>
       if (loadNewPages) loadPage(page)
@@ -73,7 +73,7 @@ class TweetLoaderActor(query: Query) extends Actor {
               buffer.append(ch.toChar)
           }
           val data = stringBuilder.toString()
-          println("Got result '" + data.take(20) + "' from " + url)
+          println("Got result '" + data.take(15) + "' from " + url)
           context.parent ! Log("DONE LOADING - " + url, null)
           data
         } finally {
@@ -83,10 +83,13 @@ class TweetLoaderActor(query: Query) extends Actor {
         case e => e.printStackTrace()
         null
       }
-    }.foreach {
-      text =>
-      self ! ParseJson(text)
-      self ! LoadNextPage(page + 1)
+    }.onFailure{
+      case e =>
+      self ! Log("Error occured: " + e.getMessage)
+    }.onSuccess {
+      case text =>
+        self ! ParseJson(text)
+        self ! LoadNextPage(page + 1)
     }
   }
 

@@ -1,46 +1,152 @@
 @(websocketUrl: String)
 
-@main("Query Client", scripts = Seq("jquery.websocket-0.0.1.js", "jquery.json-2.3.min.js")) {
-<h1>Query Client</h1>
-<div style="float: left; width: 30%">
-    <input id="query" type="text"/>
-    <input id="resultsPerPage" maxlength="4" size="3" type="text" value="100"/>
-    <input type="button" id="start" value="start"/>
-    <input type="button" id="stop" value="stop"/>
-    <div id="content"></div>
+@main_bs("Query Client", scripts = Seq("jquery.websocket-0.0.1.js", "jquery.json-2.3.min.js", "http://d3js.org/d3.v2.js")) {
+
+
+<!-- Main hero unit for a primary marketing message or call to action -->
+<div class="hero-unit">
+    <h1>Twitter Buzzwords</h1>
+    <p>Search for a Buzzwords and see which other words buzz around ...</p>
+    <div class="row">
+        <div class="span7">
+            <form class="form-horizontal">
+                <div class="control-group">
+                    <label class="control-label" for="query">Buzzword</label>
+
+                    <div class="controls">
+                        <input type="text" id="query" placeholder="Buzzword...">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label class="control-label" for="resultsPerPage">Results per Page</label>
+
+                    <div class="controls">
+                        <input type="text" maxlength="4" size="4" id="resultsPerPage" value="100">
+                    </div>
+                </div>
+                <button type="button" id="start" class="btn">Start</button>
+                <button type="button" id="stop" class="btn">Stop</button>
+            </form>
+        </div>
+        <div class="span2">
+            <dl class="dl-horizontal">
+                <dt>Page</dt>
+                <dd id="stats_page">-</dd>
+
+                <dt>Tweets</dt>
+                <dd id="stats_tweets">-</dd>
+            </dl>
+        </div>
+    </div>
 </div>
-<div id="status" style="float: left; width: 30%; overflow: scroll;">
-    <table>
-        <tr>
-            <td>Page</td>
-            <td id="stats_page"></td>
-        </tr>
-        <tr>
-            <td>Tweets</td>
-            <td id="stats_tweets"></td>
-        </tr>
-    </table>
+<div class="row">
+    <div class="span8">
+        <div id="chart"></div>
+    </div>
+    <div class="row span4">
+        <div>
+            <h4>Logging Console</h4>
+
+            <div id="log" style="height: 450px; overflow: scroll;"></div>
+        </div>
+    </div>
 </div>
-<div id="log" style="float: left; width: 30%; overflow: scroll;"></div>
+<style>
+
+    svg {
+        font: 10px sans-serif;
+    }
+
+    .axis path, .axis line {
+        fill: none;
+        stroke: #000;
+        shape-rendering: crispEdges;
+    }
+
+    sup, sub {
+        line-height: 0;
+    }
+
+    q:before,
+    blockquote:before {
+        content: "“";
+    }
+
+    q:after,
+    blockquote:after {
+        content: "”";
+    }
+
+    blockquote:before {
+        position: absolute;
+        left: 2em;
+    }
+
+    blockquote:after {
+        position: absolute;
+    }
+
+    svg {
+        font: 10px sans-serif;
+    }
+
+    .bar rect {
+        fill: steelblue;
+    }
+
+    .bar:hover rect {
+        fill: brown;
+    }
+
+    .value {
+        fill: white;
+    }
+
+    .axis {
+        shape-rendering: crispEdges;
+    }
+
+    .axis path {
+        stroke: none;
+    }
+
+    .x.axis line {
+        stroke: #fff;
+        stroke-opacity: .8;
+    }
+
+    .y.axis path {
+        stroke: black;
+    }
+
+</style>
+
 <script>
     var resultHandler = {
         histogram:function (msg) {
-            $('#content').children().remove()
-            var table = $("<table>")
-            var entries = msg.data
-            for (var i = 0; i < entries.length; i++) {
-                table.append($("<tr><td>" + entries[i].word + "</td><td>" + entries[i].count + "</td></tr>"))
-            }
-            $('#content').append(table)
+            d3.transition()
+                    .duration(200)
+                    .each(function () {
+                        redraw(msg.data)
+                    });
         },
 
         log:function (msg) {
-            $("#log").prepend($("<p>" + msg.data + "</p>"))
+            $("#log").prepend($("<pre><small>" + msg.data + "</small></pre>"))
         },
 
-        stats: function(msg){
+        stats:function (msg) {
             $("#stats_" + msg.data.name).text(msg.data.value)
         }
+    }
+
+    function drawTable(entries) {
+        $('#content').children().remove()
+        var table = $("<table>")
+        for (var i = 0; i < entries.length; i++) {
+            table.append($("<tr><td>" + entries[i].word + "</td><td>" + entries[i].count + "</td></tr>"))
+        }
+        $('#content').append(table)
     }
 
 
@@ -51,11 +157,155 @@
         var resultsPerPage = parseInt($("#resultsPerPage").val())
         var queryString = $("#query").val()
 
-        if(queryString && resultsPerPage)
-            ws.send('query', {query: queryString, resultsPerPage: resultsPerPage});
+        if (queryString && resultsPerPage)
+            ws.send('query', {query:queryString, resultsPerPage:resultsPerPage});
     });
     $('#stop').click(function () {
         ws.send('stop', {});
     });
+
+    var margin = {top:20, right:40, bottom:10, left:40},
+            width = 700,
+            height = 500 - margin.top - margin.bottom;
+
+    var format = d3.format(".1%"),
+            states,
+            age;
+
+    var x = d3.scale.linear()
+            .range([0, width]);
+
+    var y = d3.scale.ordinal()
+            .rangeRoundBands([0, height], .1);
+
+    var xAxis = d3.svg.axis()
+            .scale(x)
+            .orient("top")
+            .tickSize(-height - margin.bottom)
+            .tickFormat(format);
+
+    var svg = d3.select("#chart").append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .style("margin-left", -margin.left + "px")
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    svg.append("g")
+            .attr("class", "x axis");
+
+    svg.append("g")
+            .attr("class", "y axis")
+            .append("line")
+            .attr("class", "domain")
+            .attr("y2", height);
+
+
+    function redraw(values) {
+
+
+        y.domain(values.map(function (d) {
+            return d.word;
+        }));
+
+        function isTop(v){
+            return values[0].count / v.count < 2
+        }
+
+        var bar = svg.selectAll(".bar")
+                .data(values, function (d) {
+                    return d.word;
+                });
+
+        var barEnter = bar.enter().insert("g", ".axis")
+                .attr("class", "bar")
+                .attr("transform", function (d) {
+                    return "translate(0," + (y(d.word) + height) + ")";
+                })
+                .style("fill-opacity", 0);
+
+        barEnter.append("rect")
+                .attr("width", function (d) {
+                    return x(d.count)
+                })
+                .attr("height", y.rangeBand());
+
+        barEnter.append("text")
+                .attr("class", "label")
+                .attr("x", -3)
+                .attr("y", y.rangeBand() / 2)
+                .attr("dy", ".35em")
+                .attr("text-anchor", "end")
+                .text(function(d, i) { return "#" + i });
+
+        barEnter.append("text")
+                .attr("class", "value")
+                .attr("x", function (d) {
+                    return x(d.count) - 3;
+                })
+                .attr("y", y.rangeBand() / 2)
+                .attr("dy", ".35em")
+
+
+        x.domain([0, values[0] ? values[0].count : 0]);
+
+        var barUpdate = d3.transition(bar)
+                .attr("transform", function (d) {
+                    return "translate(0," + (d.y0 = y(d.word)) + ")";
+                })
+                .style("fill-opacity", 1);
+
+        barUpdate.select(".value")
+                .attr("y", y.rangeBand() / 2)
+
+        barUpdate.select(".label")
+                .attr("y", y.rangeBand() / 2)
+                .text(function(d, i) { return "#" + (i+1) });
+
+        barUpdate.select("rect")
+                .attr("width", function (d) {
+                    return x(d.count);
+                })
+                .attr("height", y.rangeBand());
+
+        barUpdate.select(".value")
+                .attr("x", function (d, i) {
+                    return x(d.count) + (isTop(d)  ? -3 : 3) ;
+                })
+                .text(function (d) {
+                    return d.word;
+                })
+                .attr("text-anchor", function(v, i){
+                    return isTop(v)  ? "end" : "start"
+                })
+                .style("fill", function(v, i){
+                        return  isTop(v) ? "white" : "black"
+                 });
+
+        var barExit = d3.transition(bar.exit())
+                .attr("transform", function (d) {
+                    return "translate(0," + (d.y0 + height) + ")";
+                })
+                .style("fill-opacity", 0)
+                .remove();
+
+        barExit.select("rect")
+                .attr("width", function (d) {
+                    return x(d.count);
+                });
+
+        barExit.select(".value")
+                .attr("x", function (d) {
+                    return x(d.count) - 3;
+                })
+                .text(function (d) {
+                    return format(d.count);
+                });
+
+        d3.transition(svg).select(".x.axis")
+                .call(xAxis);
+    }
+
+
 </script>
 }
