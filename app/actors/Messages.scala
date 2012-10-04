@@ -1,6 +1,7 @@
 package actors
 
 import play.api.libs.json.JsValue
+import java.util.Date
 
 /**
  * Created with IntelliJ IDEA.
@@ -17,6 +18,7 @@ object LogLevel extends Enumeration{
 
 case class Query(query: String, resultsPerPage: Int)
 case class Histogram(map: Seq[(String, Int)])
+case class Timespan(min: Date, max: Date)
 case class Stop()
 case class LoadNextPage(page: Int)
 case class ParseJson(string: String)
@@ -24,4 +26,5 @@ case class Outbound(resultType: String, value: JsValue)
 case class Log(message: String, level: LogLevel.LogLevel = LogLevel.INFO)
 case class Stats(name: String, value: String)
 case class Tweets(count: Int)
+case class MessageProcessingStop()
 

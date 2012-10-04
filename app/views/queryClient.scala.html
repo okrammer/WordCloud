@@ -8,7 +8,7 @@
     <h1>Twitter Buzzwords</h1>
     <p>Search for a Buzzwords and see which other words buzz around ...</p>
     <div class="row">
-        <div class="span7">
+        <div class="span6">
             <form class="form-horizontal">
                 <div class="control-group">
                     <label class="control-label" for="query">Buzzword</label>
@@ -28,13 +28,20 @@
                 <button type="button" id="stop" class="btn">Stop</button>
             </form>
         </div>
-        <div class="span2">
+        <div class="span3">
             <dl class="dl-horizontal">
                 <dt>Page</dt>
                 <dd id="stats_page">-</dd>
 
                 <dt>Tweets</dt>
                 <dd id="stats_tweets">-</dd>
+
+                <dt>Oldest Tweet</dt>
+                <dd id="stats_minTimespan">-</dd>
+
+                <dt>Newest Tweet</dt>
+                <dd id="stats_maxTimespan">-</dd>
+
             </dl>
         </div>
     </div>

@@ -2,7 +2,7 @@ package controllers
 
 import play.api.mvc._
 import akka.actor.{ActorRef, Props}
-import actors.{Inbound, MessageProcessingActor}
+import actors.{MessageProcessingStop, Stop, Inbound, MessageProcessingActor}
 import play.api.Play.current
 import play.api.libs.json.{JsValue, Json}
 import play.api.libs.iteratee.{Enumerator, Iteratee}
@@ -32,7 +32,6 @@ object Application extends Controller {
       def sendOutboundMessage(msgType: String, value: JsValue) {
         val jsonMessage = toJson(Map("type" -> toJson(msgType), "data" -> value))
         val msg = Json.stringify(jsonMessage)
-        println("putting:" + msg)
         out.push(msg)
       }
 
@@ -40,24 +39,16 @@ object Application extends Controller {
 
       val in = Iteratee.foreach[String] {
         value =>
-          println("getting:" + value)
           val json = Json.parse(value)
           val data =  json \ "data"
           val msgType = (json \ "type").as[String]
           processingActor ! Inbound(msgType, data)
-      }.mapDone {
-        _ =>
-          println("Disconnected")
+      }.mapDone{
+        processingActor ! MessageProcessingStop()
+        null
       }
 
       (in, out)
-  }
-
-  private def processInboundMessage(json: JsValue, processingActor: ActorRef, send: (String, JsValue) => Unit) {
-
-    // use here an actor so we can possibly address this actor over remote
-
-
   }
 
 }

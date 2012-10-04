@@ -4,6 +4,10 @@ import akka.actor.{ActorRef, Props, Actor}
 import akka.dispatch.Future
 import java.net.URL
 import java.io.InputStreamReader
+import helper.HttpLoader
+import java.util.{Locale, Date}
+import java.text.{SimpleDateFormat, DateFormat}
+import akka.util.duration._
 
 /**
  * Created with IntelliJ IDEA.
@@ -14,11 +18,17 @@ import java.io.InputStreamReader
  */
 class TweetLoaderActor(query: Query) extends Actor {
 
+  val maxWait = 60
+  val waitBetweenLogs = 5
+
   private var currentHistogram = Map[String, Int]()
   println("Initialising TweetLoaderActor")
 
   private var loadNewPages = true
   private var tweetCount = 0
+
+  private var maxDate = new Date(0)
+  private var minDate = new Date(Long.MaxValue)
 
 
   protected def receive = {
@@ -35,6 +45,16 @@ class TweetLoaderActor(query: Query) extends Actor {
 
       context.parent ! Histogram(currentHistogram.toList.sortBy(_._2).reverse.take(20))
 
+    case date: Date =>
+      if (date.getTime > maxDate.getTime){
+        maxDate = date
+        context.parent ! Stats("maxTimespan", dateFormat.format(date))
+      }
+      if (date.getTime < minDate.getTime){
+        minDate = date
+        context.parent ! Stats("minTimespan", dateFormat.format(date))
+      }
+
     case LoadNextPage(page) =>
       if (loadNewPages) loadPage(page)
 
@@ -43,7 +63,7 @@ class TweetLoaderActor(query: Query) extends Actor {
       context.parent ! Log("STOPPING LOAD PAGES")
 
     case ParseJson(text) =>
-      jsonParserActor ! text
+      context.actorOf(Props[JsonParseActor]) ! text
 
     case log: Log => context.parent ! log
 
@@ -53,44 +73,51 @@ class TweetLoaderActor(query: Query) extends Actor {
 
     case s: Stats =>
       context.parent ! s
+
+    case WaitingAfter403(waitTime, nextPage) if waitTime <= 0 =>
+      self ! Log("TRY AGAIN ...")
+      self ! LoadNextPage(nextPage)
+
+    case WaitingAfter403(waitTime, nextPage) =>
+      self ! Log("WAITING -- %ss".format(waitTime))
+      context.system.scheduler.scheduleOnce(waitBetweenLogs seconds){
+        self ! WaitingAfter403(waitTime - waitBetweenLogs, nextPage)
+      }
+
   }
 
-  def jsonParserActor = context.actorOf(Props[JsonParseActor])
+  def dateFormat =  new SimpleDateFormat("yyyy-MM-dd HH:mm")
 
   def loadPage(page: Int) {
     context.parent ! Stats("page", page.toString())
     val url: String = "http://search.twitter.com/search.json?q=%s&rpp=%s&include_entities=true&result_type=mixed&page=%s".format(query.query, query.resultsPerPage, page)
     implicit val executionContext = context.dispatcher
+
+    val httpLoader = new HttpLoader(url)
     Future[String] {
-      println("Loading: " + url)
-      try {
-        context.parent ! Log("LOADING - " + url, null)
-        val connection = new URL(url).openConnection()
-        val stream = new InputStreamReader(connection.getInputStream, "UTF-8")
-        try {
-          val stringBuilder = Stream.continually(stream.read()).takeWhile(_ != -1).foldLeft(new StringBuilder()) {
-            (buffer, ch) =>
-              buffer.append(ch.toChar)
-          }
-          val data = stringBuilder.toString()
-          println("Got result '" + data.take(15) + "' from " + url)
-          context.parent ! Log("DONE LOADING - " + url, null)
-          data
-        } finally {
-          stream.close()
-        }
-      } catch {
-        case e => e.printStackTrace()
-        null
-      }
+      val beginTime = System.currentTimeMillis()
+      context.parent ! Log("LOADING - " + url)
+      val contentString = httpLoader.load()
+      context.parent ! Log("DONE LOADING - %sms".format(System.currentTimeMillis() - beginTime))
+      contentString
     }.onFailure{
       case e =>
-      self ! Log("Error occured: " + e.getMessage)
+        if (httpLoader.statusCode == 403){
+          self ! Log("Got 403 from Twitter wating, to try again ...")
+          self ! WaitingAfter403(maxWait, page + 1)
+        }else {
+          self ! Log("Error occured: " + e.getMessage + "; ResponseMessage: " + httpLoader.responseMessage)
+        }
+
     }.onSuccess {
       case text =>
-        self ! ParseJson(text)
         self ! LoadNextPage(page + 1)
+        self ! ParseJson(text)
+
     }
   }
+
+  case class WaitingAfter403(seconds: Int, nextPageToLoad: Int)
+
 
 }

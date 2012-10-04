@@ -2,6 +2,8 @@ package actors
 
 import akka.actor.Actor
 import play.api.libs.json.{JsValue, Json}
+import java.text.{DateFormat, SimpleDateFormat}
+import java.util.{Locale, Date}
 
 /**
  * Created with IntelliJ IDEA.
@@ -15,12 +17,28 @@ class JsonParseActor extends Actor {
   protected def receive = {
     case content: String =>
       println("Parsing Json " + content.take(30))
+      val beginTime = System.currentTimeMillis()
       context.parent ! Log("PARSING -- length: " + content.length)
       val result = Json.parse(content)
       val texts: Seq[JsValue] = (result \\ "text")
+      val dates: Seq[JsValue] = (result \\ "created_at")
+
+      val format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.UK)
+      val dateAsLongList = for{
+        date <- dates
+        dateString <- date.asOpt[String]
+        d = format.parse(dateString)
+        l = d.getTime
+      } yield l
+
+      if(dateAsLongList.nonEmpty){
+        context.parent ! new Date(dateAsLongList.max)
+        context.parent ! new Date(dateAsLongList.min)
+      }
+
+
       context.parent ! Tweets(texts.size)
-      println("Got texts: " + texts)
-      context.parent ! Log("PARSING DONE -- texts: " + texts.size)
+
       if (texts.size == 0) {
         context.parent ! Stop()
       } else {
@@ -35,6 +53,7 @@ class JsonParseActor extends Actor {
           if !strippedToken.startsWith("@")
         } context.parent ! Histogram(Seq(strippedToken -> 1))
       }
+      context.parent ! Log("PARSING DONE -- %sms".format(System.currentTimeMillis() - beginTime))
 
       context.stop(self)
   }

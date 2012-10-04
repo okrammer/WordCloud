@@ -46,6 +46,9 @@ class MessageProcessingActor(sender: (String, JsValue) => Unit) extends Actor {
 
     case Stats(name, value) =>
       self ! Outbound("stats", JsObject(Seq("name" -> toJson(name), "value" -> toJson(value))))
+
+    case MessageProcessingStop =>
+      context.stop(self)
   }
 
 }
