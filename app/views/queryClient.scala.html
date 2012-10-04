@@ -6,30 +6,29 @@
 <!-- Main hero unit for a primary marketing message or call to action -->
 <div class="hero-unit">
     <h1>Twitter Buzzwords</h1>
+
     <p>Search for a Buzzwords and see which other words buzz around ...</p>
+
     <div class="row">
         <div class="span6">
             <form class="form-horizontal">
-                <div class="control-group">
-                    <label class="control-label" for="query">Buzzword</label>
-
-                    <div class="controls">
-                        <input type="text" id="query" placeholder="Buzzword...">
-                    </div>
+                <hr/>
+                <div class="input-append">
+                    <input type="text" id="query" placeholder="Buzzword...">
+                    <button type="button" id="start" class="btn btn-primary">Start Search</button>
+                    <button type="button" id="stop" class="btn">Stop</button>
                 </div>
-                <div class="control-group">
-                    <label class="control-label" for="resultsPerPage">Results per Page</label>
-
-                    <div class="controls">
-                        <input type="text" maxlength="4" size="4" id="resultsPerPage" value="100">
-                    </div>
-                </div>
-                <button type="button" id="start" class="btn">Start</button>
-                <button type="button" id="stop" class="btn">Stop</button>
+                <select id="resultsPerPage" style="margin-top: 10px">
+                    <option value="10">10 Results per Page</option>
+                    <option value="50">50 Results per Page</option>
+                    <option value="100" selected="selected">100 Results per Page</option>
+                    <option value="500">500 Results per Page</option>
+                    <option value="1000">1000 Results per Page</option>
+                </select>
             </form>
         </div>
-        <div class="span3">
-            <dl class="dl-horizontal">
+        <div class="span4">
+            <dl>
                 <dt>Page</dt>
                 <dd id="stats_page">-</dd>
 
@@ -48,7 +47,7 @@
 </div>
 <div class="row">
     <div class="span8">
-        <div id="chart"></div>
+        <div id="chart" style="margin-left: 30px"></div>
     </div>
     <div class="row span4">
         <div>
@@ -171,8 +170,10 @@
         ws.send('stop', {});
     });
 
+    var chartDiv = d3.select("#chart")
+
     var margin = {top:20, right:40, bottom:10, left:40},
-            width = 700,
+            width = parseInt(chartDiv.style("width")),
             height = 500 - margin.top - margin.bottom;
 
     var format = d3.format(".1%"),
@@ -191,7 +192,7 @@
             .tickSize(-height - margin.bottom)
             .tickFormat(format);
 
-    var svg = d3.select("#chart").append("svg")
+    var svg = chartDiv.append("svg")
             .attr("width", width + margin.left + margin.right)
             .attr("height", height + margin.top + margin.bottom)
             .style("margin-left", -margin.left + "px")
@@ -215,7 +216,7 @@
             return d.word;
         }));
 
-        function isTop(v){
+        function isTop(v) {
             return values[0].count / v.count < 2
         }
 
@@ -243,7 +244,9 @@
                 .attr("y", y.rangeBand() / 2)
                 .attr("dy", ".35em")
                 .attr("text-anchor", "end")
-                .text(function(d, i) { return "#" + i });
+                .text(function (d, i) {
+                    return "#" + i
+                });
 
         barEnter.append("text")
                 .attr("class", "value")
@@ -267,7 +270,9 @@
 
         barUpdate.select(".label")
                 .attr("y", y.rangeBand() / 2)
-                .text(function(d, i) { return "#" + (i+1) });
+                .text(function (d, i) {
+                    return "#" + (i + 1)
+                });
 
         barUpdate.select("rect")
                 .attr("width", function (d) {
@@ -277,17 +282,17 @@
 
         barUpdate.select(".value")
                 .attr("x", function (d, i) {
-                    return x(d.count) + (isTop(d)  ? -3 : 3) ;
+                    return x(d.count) + (isTop(d) ? -3 : 3);
                 })
                 .text(function (d) {
                     return d.word;
                 })
-                .attr("text-anchor", function(v, i){
-                    return isTop(v)  ? "end" : "start"
+                .attr("text-anchor", function (v, i) {
+                    return isTop(v) ? "end" : "start"
                 })
-                .style("fill", function(v, i){
-                        return  isTop(v) ? "white" : "black"
-                 });
+                .style("fill", function (v, i) {
+                    return  isTop(v) ? "white" : "black"
+                });
 
         var barExit = d3.transition(bar.exit())
                 .attr("transform", function (d) {
