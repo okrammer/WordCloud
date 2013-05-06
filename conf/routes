@@ -5,8 +5,8 @@
 # Home page
 GET     /                      controllers.Application.echoClient()
 GET     /wsevents              controllers.Application.wsevents()
-GET     /echoClient          controllers.Application.echoClient()
-GET     /queryClient          controllers.Application.queryClient()
+#GET     /echoClient            controllers.Application.echoClient()
+GET     /queryClient           controllers.Application.queryClient()
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file           controllers.Assets.at(path="/public", file)

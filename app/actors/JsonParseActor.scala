@@ -14,7 +14,7 @@ import java.util.{Locale, Date}
  */
 class JsonParseActor extends Actor {
 
-  protected def receive = {
+  def receive = {
     case content: String =>
       println("Parsing Json " + content.take(30))
       val beginTime = System.currentTimeMillis()

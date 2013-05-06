@@ -1,13 +1,12 @@
 package actors
 
-import akka.actor.{ActorRef, Props, Actor}
-import akka.dispatch.Future
-import java.net.URL
-import java.io.InputStreamReader
+import akka.actor.{Props, Actor}
+import scala.concurrent.Future
 import helper.HttpLoader
-import java.util.{Locale, Date}
-import java.text.{SimpleDateFormat, DateFormat}
-import akka.util.duration._
+import java.util.Date
+import java.text.SimpleDateFormat
+import scala.concurrent.duration._
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
 
 /**
  * Created with IntelliJ IDEA.
@@ -31,14 +30,14 @@ class TweetLoaderActor(query: Query) extends Actor {
   private var minDate = new Date(Long.MaxValue)
 
 
-  protected def receive = {
+  def receive = {
     case Histogram(tuples) =>
       currentHistogram = tuples.foldRight(currentHistogram) {
         (e, m) =>
           val (word, count) = e
-          if (word contains query.query.toLowerCase){
+          if (word contains query.query.toLowerCase) {
             m
-          }else{
+          } else {
             m.updated(word, m.get(word).getOrElse(0) + count)
           }
       }
@@ -46,11 +45,11 @@ class TweetLoaderActor(query: Query) extends Actor {
       context.parent ! Histogram(currentHistogram.toList.sortBy(_._2).reverse.take(20))
 
     case date: Date =>
-      if (date.getTime > maxDate.getTime){
+      if (date.getTime > maxDate.getTime) {
         maxDate = date
         context.parent ! Stats("maxTimespan", dateFormat.format(date))
       }
-      if (date.getTime < minDate.getTime){
+      if (date.getTime < minDate.getTime) {
         minDate = date
         context.parent ! Stats("minTimespan", dateFormat.format(date))
       }
@@ -80,13 +79,13 @@ class TweetLoaderActor(query: Query) extends Actor {
 
     case WaitingAfter403(waitTime, nextPage) =>
       self ! Log("WAITING -- %ss".format(waitTime))
-      context.system.scheduler.scheduleOnce(waitBetweenLogs seconds){
+      context.system.scheduler.scheduleOnce(waitBetweenLogs seconds) {
         self ! WaitingAfter403(waitTime - waitBetweenLogs, nextPage)
       }
 
   }
 
-  def dateFormat =  new SimpleDateFormat("yyyy-MM-dd HH:mm")
+  def dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm")
 
   def loadPage(page: Int) {
     context.parent ! Stats("page", page.toString())
@@ -94,22 +93,24 @@ class TweetLoaderActor(query: Query) extends Actor {
     implicit val executionContext = context.dispatcher
 
     val httpLoader = new HttpLoader(url)
-    Future[String] {
+    val future = Future[String] {
       val beginTime = System.currentTimeMillis()
       context.parent ! Log("LOADING - " + url)
       val contentString = httpLoader.load()
       context.parent ! Log("DONE LOADING - %sms".format(System.currentTimeMillis() - beginTime))
       contentString
-    }.onFailure{
+    }
+    future.onFailure {
       case e =>
-        if (httpLoader.statusCode == 403){
+        if (httpLoader.statusCode == 403) {
           self ! Log("Got 403 from Twitter wating, to try again ...")
           self ! WaitingAfter403(maxWait, page + 1)
-        }else {
+        } else {
           self ! Log("Error occured: " + e.getMessage + "; ResponseMessage: " + httpLoader.responseMessage)
         }
 
-    }.onSuccess {
+    }
+    future.onSuccess {
       case text =>
         self ! LoadNextPage(page + 1)
         self ! ParseJson(text)

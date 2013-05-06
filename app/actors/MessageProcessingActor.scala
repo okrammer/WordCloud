@@ -3,9 +3,10 @@ package actors
 import akka.actor.{ActorRef, Props, Actor}
 import play.api.libs.concurrent.Akka
 import play.api.Play.current
-import akka.util.duration._
+import scala.concurrent.duration._
 import play.api.libs.json.{JsValue, JsObject}
 import play.api.libs.json.Json._
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
 
 /**
  * Created with IntelliJ IDEA.
@@ -18,7 +19,7 @@ class MessageProcessingActor(sender: (String, JsValue) => Unit) extends Actor {
 
   var queryActors = Seq[ActorRef]()
 
-  protected def receive = {
+  def receive = {
     case Inbound("echo", data: JsValue) =>
       val string = data.as[String]
 

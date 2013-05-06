@@ -3,7 +3,8 @@ package actors
 import akka.actor.{Props, Actor}
 import play.api.libs.json.Json._
 import play.api.libs.json.JsObject
-import akka.util.duration._
+import scala.concurrent.duration._
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
 
 
 /**
@@ -21,7 +22,7 @@ class TweetQueryActor(query: Query) extends Actor {
   val tweetLoaderActor = context.actorOf(Props(new TweetLoaderActor(query)))
   tweetLoaderActor ! LoadNextPage(1)
 
-  protected def receive = {
+  def receive = {
     case histogram: Histogram =>
       if (latestHistogram.isEmpty) {
         context.system.scheduler.scheduleOnce(500 milliseconds) {
